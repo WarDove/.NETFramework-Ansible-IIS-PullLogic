@@ -1,0 +1,53 @@
+image: wardove/ansible-dotnet-framework:1.0.13-ubuntu20.04
+
+before_script: 
+
+  - echo "IMAGE INTERNAL LOCATION IS $PWD"
+  - echo "SYSTEM INFO:"
+  - cat /etc/os-release
+  - cat /etc/hostname
+
+Deploy to Test:  
+
+  stage: deploy  
+
+  tags:
+
+    - dind-3
+    
+  script:    
+
+    - source /ansible/scripts/set_variables.sh
+    - cat /ansible/host_vars/$IIS_SERVER.yml
+    - ansible-playbook /ansible/deploy.yml -i /ansible/hosts 
+  environment: test
+
+  only:
+
+    - merge_requests
+    - master
+
+
+Deploy to Prod:
+
+  stage: deploy
+
+  tags:
+
+    - dind-3
+
+  script:    
+
+    - source /ansible/scripts/set_variables.sh
+    - cat /ansible/host_vars/$IIS_SERVER.yml
+    - ansible-playbook /ansible/deploy.yml -i /ansible/hosts 
+
+  environment: production
+
+  only:
+
+    - merge_requests
+    - master
+
+  when: manual
+

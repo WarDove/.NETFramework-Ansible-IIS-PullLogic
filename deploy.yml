@@ -1,0 +1,61 @@
+---
+- name: Creating folders and moving source code to IIS
+  hosts: "{{ lookup('env','IIS_SERVER') }}"
+  gather_facts: no
+  tasks:
+    
+    - name: Creating website folder on IIS
+      ansible.windows.win_file:
+        path: "{{ lookup('env','WEB_PATH') }}"
+        state: directory
+
+    - name: Pull the repo to local IIS
+      win_git:
+        repo: "{{ lookup('env','CI_REPOSITORY_URL') }}"
+        dest: "{{ lookup('env','SRC_APP_PATH') }}"
+        branch: master
+        update: no
+        recursive: yes
+        replace_dest: no
+        accept_hostkey: yes
+
+
+    - name: Place Publish Profile for IIS deployment
+      win_template:
+        src: templates/pubxml.j2
+        dest: "{{ lookup('env','SRC_APP_PATH') }}\\iisdeploy.pubxml"
+
+    - name: Execute Nuget and download packages from packages.config file
+      ansible.windows.win_command: nuget restore
+      args:
+        chdir: "{{ lookup('env','SRC_APP_PATH') }}"
+    
+    - name: Execute MsBuild and publish to destination WEB_PATH for IIS
+      ansible.windows.win_command: msbuild  /p:DeployOnBuild=true /p:PublishProfile={{ lookup('env','SRC_APP_PATH') }}\\iisdeploy.pubxml
+      args:
+        chdir: "{{ lookup('env','SRC_APP_PATH') }}"
+   
+   
+
+- name: Creating Webpool Site Api
+  hosts: "{{ lookup('env','IIS_SERVER') }}"
+  gather_facts: no
+  tasks:
+
+    - name: Create a new application pool in 'Started' state
+      community.windows.win_iis_webapppool:
+        name: "{{ lookup('env','POOL_NAME') }}"
+        state: started
+
+    - name: Crate IIS site
+      community.windows.win_iis_website:
+        name: "{{ lookup('env','WEB_NAME') }}"
+        state: started
+        port: "{{ lookup('env','WEB_PORT') }}"
+        ip: "{{ lookup('env','WEB_IP') }}"
+        hostname: "{{ lookup('env','WEB_HOSTNAME') }}"
+        application_pool: "{{ lookup('env','POOL_NAME') }}"
+        physical_path: "{{ lookup('env','WEB_PATH') }}"
+        parameters: logfile.directory:{{ lookup('env','WEB_LOG_PATH') }}
+      register: website
+...
